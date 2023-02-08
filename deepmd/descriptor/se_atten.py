@@ -682,32 +682,33 @@ class DescrptSeAtten(DescrptSeA):
                 nei_embed = tf.nn.embedding_lookup(type_embedding,
                                                    self.nei_type_vec)  # shape is [self.nnei, te_out_dim]
                 nei_embed = tf.reshape(nei_embed, [-1, te_out_dim])
-                nei_suffix = suffix + "nei"
-                nei_embed_output = embedding_net(
-                    nei_embed,
-                    self.filter_neuron,
-                    self.filter_precision,
-                    activation_fn=activation_fn,
-                    resnet_dt=self.filter_resnet_dt,
-                    name_suffix=nei_suffix,
-                    stddev=stddev,
-                    bavg=bavg,
-                    seed=self.seed,
-                    trainable=trainable,
-                    uniform_seed=self.uniform_seed,
-                    initial_variables=self.embedding_net_variables,
-                    mixed_prec=self.mixed_prec)
-
-                atm_embed_output = None
-                if not self.type_one_side:
+                if self.type_one_side:
+                    nei_suffix = suffix + "nei"
+                    nei_embed_output = embedding_net(
+                        nei_embed,
+                        self.filter_neuron,
+                        self.filter_precision,
+                        activation_fn=activation_fn,
+                        resnet_dt=self.filter_resnet_dt,
+                        name_suffix=nei_suffix,
+                        stddev=stddev,
+                        bavg=bavg,
+                        seed=self.seed,
+                        trainable=trainable,
+                        uniform_seed=self.uniform_seed,
+                        initial_variables=self.embedding_net_variables,
+                        mixed_prec=self.mixed_prec)
+                    xyz_scatter = col_1_embedding_output + nei_embed_output
+                else:
                     atm_embed = tf.nn.embedding_lookup(type_embedding, atype)  # shape is [nframes*natoms[0], te_out_dim]
                     atm_embed = tf.tile(atm_embed,
                                         [1, self.nnei])  # shape is [nframes*natoms[0], self.nnei*te_out_dim]
                     atm_embed = tf.reshape(atm_embed,
-                                           [-1, te_out_dim])  # shape is [nframes*natoms[0]*self.nnei, te_out_dim]
-                    atm_suffix = suffix + "atm"
-                    atm_embed_output = embedding_net(
-                        atm_embed,
+                                        [-1, te_out_dim])  # shape is [nframes*natoms[0]*self.nnei, te_out_dim]
+                    atm_suffix = suffix + "two_side"
+                    two_side_embed = tf.concat([nei_embed, atm_embed], -1)
+                    two_side_embed_output = embedding_net(
+                        two_side_embed,
                         self.filter_neuron,
                         self.filter_precision,
                         activation_fn=activation_fn,
@@ -720,9 +721,7 @@ class DescrptSeAtten(DescrptSeA):
                         uniform_seed=self.uniform_seed,
                         initial_variables=self.embedding_net_variables,
                         mixed_prec=self.mixed_prec) 
-                xyz_scatter = col_1_embedding_output + nei_embed_output
-                if atm_embed_output is not None:
-                    xyz_scatter += atm_embed_output
+                    xyz_scatter = xyz_scatter + two_side_embed_output                   
 
                 # with (natom x nei_type_i) x out_size
                 #xyz_scatter = embedding_net(
