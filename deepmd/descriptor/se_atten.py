@@ -653,13 +653,27 @@ class DescrptSeAtten(DescrptSeA):
         xyz_scatter = tf.reshape(tf.slice(inputs_reshape, [0, 0], [-1, 1]), [-1, 1])
         assert atype is not None, 'atype must exist!!'
         type_embedding = tf.cast(type_embedding, self.filter_precision)
-        xyz_scatter = self._lookup_type_embedding(
-            xyz_scatter, atype, type_embedding)
+        #xyz_scatter = self._lookup_type_embedding(
+        #    xyz_scatter, atype, type_embedding)
         if self.compress:
             raise RuntimeError('compression of attention descriptor is not supported at the moment')
         # natom x 4 x outputs_size
         if (not is_exclude):
             with tf.variable_scope(name, reuse=reuse):
+                te_out_dim = type_embedding.get_shape().as_list()[-1]
+                self.test_type_embedding = type_embedding
+                self.test_nei_embed = tf.nn.embedding_lookup(type_embedding,
+                                                            self.nei_type_vec)  # shape is [self.nnei, 1+te_out_dim]
+                # nei_embed = tf.tile(nei_embed, (nframes * natoms[0], 1))  # shape is [nframes*natoms[0]*self.nnei, te_out_dim]
+                nei_embed = tf.reshape(self.test_nei_embed, [-1, te_out_dim])
+                if not self.type_one_side:
+                    self.atm_embed = tf.nn.embedding_lookup(type_embedding, atype)  # shape is [nframes*natoms[0], te_out_dim]
+                    self.atm_embed = tf.tile(self.atm_embed,
+                                            [1, self.nnei])  # shape is [nframes*natoms[0], self.nnei*te_out_dim]
+                    self.atm_embed = tf.reshape(self.atm_embed,
+                                                [-1, te_out_dim])  # shape is [nframes*natoms[0]*self.nnei, te_out_dim]
+                    self.embedding_input_2 = tf.concat([nei_embed, self.atm_embed],
+                                                    1)  # shape is [nframes*natoms[0]*self.nnei, 1+te_out_dim+te_out_dim]
                 # with (natom x nei_type_i) x out_size
                 xyz_scatter = embedding_net(
                     xyz_scatter,
@@ -675,6 +689,7 @@ class DescrptSeAtten(DescrptSeA):
                     uniform_seed=self.uniform_seed,
                     initial_variables=self.embedding_net_variables,
                     mixed_prec=self.mixed_prec)
+                xyz_scatter = xyz_scatter * self.embedding_input_2 + self.embedding_input_2
                 if (not self.uniform_seed) and (self.seed is not None): self.seed += self.seed_shift
             input_r = tf.slice(tf.reshape(inputs_i, (-1, shape_i[1] // 4, 4)), [0, 0, 1], [-1, -1, 3])
             input_r = tf.nn.l2_normalize(input_r, -1)
