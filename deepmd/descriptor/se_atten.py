@@ -689,7 +689,7 @@ class DescrptSeAtten(DescrptSeA):
                     uniform_seed=self.uniform_seed,
                     initial_variables=self.embedding_net_variables,
                     mixed_prec=self.mixed_prec)
-                xyz_scatter = xyz_scatter * self.embedding_input_2 + self.embedding_input_2
+                xyz_scatter = xyz_scatter * self.embedding_input_2 + xyz_scatter
                 if (not self.uniform_seed) and (self.seed is not None): self.seed += self.seed_shift
             input_r = tf.slice(tf.reshape(inputs_i, (-1, shape_i[1] // 4, 4)), [0, 0, 1], [-1, -1, 3])
             input_r = tf.nn.l2_normalize(input_r, -1)
