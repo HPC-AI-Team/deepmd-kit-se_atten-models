@@ -689,6 +689,22 @@ class DescrptSeAtten(DescrptSeA):
                     uniform_seed=self.uniform_seed,
                     initial_variables=self.embedding_net_variables,
                     mixed_prec=self.mixed_prec)
+                self.embedding_input_2 = embedding_net(
+                    self.embedding_input_2,
+                    self.filter_neuron,
+                    self.filter_precision,
+                    activation_fn=activation_fn,
+                    resnet_dt=self.filter_resnet_dt,
+                    name_suffix=suffix+'input_2',
+                    stddev=stddev,
+                    bavg=bavg,
+                    seed=self.seed,
+                    trainable=trainable,
+                    uniform_seed=self.uniform_seed,
+                    initial_variables=self.embedding_net_variables,
+                    mixed_prec=self.mixed_prec)
+                #print(xyz_scatter.shape)
+                #print(self.embedding_input_2.shape)
                 xyz_scatter = xyz_scatter * self.embedding_input_2 + xyz_scatter
                 if (not self.uniform_seed) and (self.seed is not None): self.seed += self.seed_shift
             input_r = tf.slice(tf.reshape(inputs_i, (-1, shape_i[1] // 4, 4)), [0, 0, 1], [-1, -1, 3])
