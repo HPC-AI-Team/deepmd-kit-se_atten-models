@@ -655,32 +655,49 @@ class DescrptSeAtten(DescrptSeA):
         type_embedding = tf.cast(type_embedding, self.filter_precision)
         xyz_scatter = self._lookup_type_embedding(
             xyz_scatter, atype, type_embedding)
+        h = 3
+        layer_output = one_layer(xyz_scatter, h, name='H_net',
+                                   reuse=reuse, seed=self.seed, use_timestep=self.filter_resnet_dt,
+                                   activation_fn=activation_fn, precision=self.filter_precision,
+                                   uniform_seed=self.uniform_seed, initial_variables=self.embedding_net_variables,
+                                   mixed_prec=self.mixed_prec)
+        """
+                layer += one_layer(layer, self.n_neuron[ii], name='layer_' + str(ii) + suffix,
+                                   reuse=reuse, seed=self.seed, use_timestep=self.resnet_dt,
+                                   activation_fn=self.fitting_activation_fn, precision=self.fitting_precision,
+                                   uniform_seed=self.uniform_seed, initial_variables=self.fitting_net_variables,
+                                   mixed_prec=self.mixed_prec)
+        """
         if self.compress:
             raise RuntimeError('compression of attention descriptor is not supported at the moment')
         # natom x 4 x outputs_size
         if (not is_exclude):
             with tf.variable_scope(name, reuse=reuse):
                 # with (natom x nei_type_i) x out_size
-                xyz_scatter = embedding_net(
-                    xyz_scatter,
-                    self.filter_neuron,
-                    self.filter_precision,
-                    activation_fn=activation_fn,
-                    resnet_dt=self.filter_resnet_dt,
-                    name_suffix=suffix,
-                    stddev=stddev,
-                    bavg=bavg,
-                    seed=self.seed,
-                    trainable=trainable,
-                    uniform_seed=self.uniform_seed,
-                    initial_variables=self.embedding_net_variables,
-                    mixed_prec=self.mixed_prec)
-                if (not self.uniform_seed) and (self.seed is not None): self.seed += self.seed_shift
+                tmpres = []
+                for layer_idx in range(h):
+                    ly = tf.slice(layer_output, [0, layer_idx], [-1, 1])
+                    tmpres.append(embedding_net(
+                        ly,
+                        self.filter_neuron,
+                        self.filter_precision,
+                        activation_fn=activation_fn,
+                        resnet_dt=self.filter_resnet_dt,
+                        name_suffix=suffix+"_layer_"+str(layer_idx),
+                        stddev=stddev,
+                        bavg=bavg,
+                        seed=self.seed,
+                        trainable=trainable,
+                        uniform_seed=self.uniform_seed,
+                        initial_variables=self.embedding_net_variables,
+                        mixed_prec=self.mixed_prec))
+                    if (not self.uniform_seed) and (self.seed is not None): self.seed += self.seed_shift
+                result = sum(tmpres)
             input_r = tf.slice(tf.reshape(inputs_i, (-1, shape_i[1] // 4, 4)), [0, 0, 1], [-1, -1, 3])
             input_r = tf.nn.l2_normalize(input_r, -1)
             # natom x nei_type_i x out_size
             xyz_scatter_att = tf.reshape(
-                self._attention_layers(xyz_scatter, self.attn_layer, shape_i, outputs_size, input_r,
+                self._attention_layers(result, self.attn_layer, shape_i, outputs_size, input_r,
                                        dotr=self.attn_dotr, do_mask=self.attn_mask, trainable=trainable, suffix=suffix),
                 (-1, shape_i[1] // 4, outputs_size[-1]))
             # xyz_scatter = tf.reshape(xyz_scatter, (-1, shape_i[1] // 4, outputs_size[-1]))
