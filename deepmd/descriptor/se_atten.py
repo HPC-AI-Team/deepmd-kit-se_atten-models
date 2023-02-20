@@ -657,13 +657,29 @@ class DescrptSeAtten(DescrptSeA):
         #    xyz_scatter, atype, type_embedding)
         if self.compress:
             raise RuntimeError('compression of attention descriptor is not supported at the moment')
+
+        gaussian_kernel_per_type = 3
+        gaussian_kernel_arg_mu = tf.Variable(
+            [tf.random_normal([type_embedding.get_shape().as_list()[0]]) # ntypes
+                                                 for _ in range(gaussian_kernel_per_type)], trainable=True) # ntypes x 3
+        gaussian_kernel_arg_sigma = tf.Variable(
+            [tf.random_normal([type_embedding.get_shape().as_list()[0]]) # ntypes
+                                                 for _ in range(gaussian_kernel_per_type)], trainable=True) # ntypes x 3
+        @tf.function
+        def gaussian_kernel(x, mu, sigma):
+            mu = tf.cast(mu, tf.float64)
+            sigma = tf.cast(sigma, tf.float64)
+            base = tf.cast(math.sqrt(2*math.pi), tf.float64)
+            diff = x - mu
+            return tf.exp(- tf.pow(diff, 2) / (2 * tf.pow(sigma, 2)))  / (sigma * base)
+
         # natom x 4 x outputs_size
         if (not is_exclude):
             with tf.variable_scope(name, reuse=reuse):
+                srij = xyz_scatter
                 # with (natom x nei_type_i) x out_size
-                print(xyz_scatter.shape)
                 xyz_scatter = embedding_net(
-                    xyz_scatter,
+                    srij,
                     self.filter_neuron,
                     self.filter_precision,
                     activation_fn=activation_fn,
@@ -681,10 +697,15 @@ class DescrptSeAtten(DescrptSeA):
                 #                                     self.nei_type_vec)
                 #xyz_scatter = tf.reshape(xyz_scatter, [-1, out_size])  # nframes*natoms[0] * nei * out_size
 
-                if self.type_one_side:
-                    embedding_of_embedding_suffix = suffix + "_ebd_of_ebd"
-                    embedding_of_embedding = embedding_net(
-                        type_embedding,
+                nei_kernel_result_arr = []
+                arg_mu = tf.nn.embedding_lookup(gaussian_kernel_arg_mu, self.nei_type_vec)
+                arg_sigma = tf.nn.embedding_lookup(gaussian_kernel_arg_sigma, self.nei_type_vec)
+                arg_mu = tf.reshape(arg_mu, [-1])
+                arg_sigma = tf.reshape(arg_sigma, [-1])
+                for i in range(gaussian_kernel_per_type):
+                    embedding_of_embedding_suffix = suffix + "_ebd_of_ebd" + str(i)
+                    res = embedding_net(
+                        gaussian_kernel(srij, tf.slice(arg_mu, [i], [1]), tf.slice(arg_sigma, [i], [1])),
                         self.filter_neuron,
                         self.filter_precision,
                         activation_fn=activation_fn,
@@ -697,40 +718,34 @@ class DescrptSeAtten(DescrptSeA):
                         uniform_seed=self.uniform_seed,
                         initial_variables=self.embedding_net_variables,
                         mixed_prec=self.mixed_prec)  # ntypes * out_size
-                    nei_embed = tf.nn.embedding_lookup(embedding_of_embedding, self.nei_type_vec)
-                    #nei_embed = tf.reshape(self.nei_embed, [-1, out_size])  # nframes*natoms[0] * nei * out_size
+                    nei_kernel_result_arr.append(res)
+                xyz_scatter = xyz_scatter + sum(nei_kernel_result_arr)
 
-                    xyz_scatter = xyz_scatter + nei_embed
-                else:
-                    type_embedding_shape = type_embedding.get_shape().as_list()
-                    type_embedding_nei = tf.tile(tf.reshape(type_embedding, [1, type_embedding_shape[0], -1]),
-                                                 [type_embedding_shape[0], 1, 1])  # (ntypes) * ntypes * Y
-                    type_embedding_center = tf.tile(tf.reshape(type_embedding, [type_embedding_shape[0], 1, -1]),
-                                                    [1, type_embedding_shape[0], 1])  # ntypes * (ntypes) * Y
-                    two_side_type_embedding = tf.concat([type_embedding_nei, type_embedding_center], -1) # ntypes * ntypes * (Y+Y)
-                    two_side_type_embedding = tf.reshape(two_side_type_embedding, [-1, two_side_type_embedding.shape[-1]])
-                    two_side_type_embedding_suffix = suffix + "_two_side_ebd" 
-                    embedding_of_two_side_type_embedding = embedding_net(
-                        two_side_type_embedding,
-                        self.filter_neuron,
-                        self.filter_precision,
-                        activation_fn=activation_fn,
-                        resnet_dt=self.filter_resnet_dt,
-                        name_suffix=two_side_type_embedding_suffix,
-                        stddev=stddev,
-                        bavg=bavg,
-                        seed=self.seed,
-                        trainable=trainable,
-                        uniform_seed=self.uniform_seed,
-                        initial_variables=self.embedding_net_variables,
-                        mixed_prec=self.mixed_prec)
-                    #index_of_two_side = self.nei_type_vec * self.ntypes + tf.tile(atype, [1, self.nnei])
-                    tmpres1 = self.nei_type_vec * type_embedding_shape[0]
-                    tmpres2 = tf.tile(atype, [self.nnei])
-                    index_of_two_side = tmpres1 + tmpres2
-                    two_embd = tf.nn.embedding_lookup(embedding_of_two_side_type_embedding, index_of_two_side)
-
-                    xyz_scatter = xyz_scatter + two_embd
+                if not self.type_one_side:
+                    arg_mu = tf.nn.embedding_lookup(gaussian_kernel_arg_mu, self.atype_nloc)
+                    arg_sigma = tf.nn.embedding_lookup(gaussian_kernel_arg_sigma, self.atype_nloc)
+                    arg_mu = tf.reshape(arg_mu, [-1])
+                    arg_sigma = tf.reshape(arg_sigma, [-1])
+                    center_kernel_result_arr = []
+                    for i in range(gaussian_kernel_per_type):
+                        two_side_type_embedding_suffix = suffix + "_two_side_ebd" + str(i)
+                        embedding_of_two_side_type_embedding = embedding_net(
+                            #gaussian_kernel(srij, *per_kernel_arg),
+                            gaussian_kernel(srij, tf.slice(arg_mu, [0], [1]), tf.slice(arg_sigma, [1], [1])),
+                            self.filter_neuron,
+                            self.filter_precision,
+                            activation_fn=activation_fn,
+                            resnet_dt=self.filter_resnet_dt,
+                            name_suffix=two_side_type_embedding_suffix,
+                            stddev=stddev,
+                            bavg=bavg,
+                            seed=self.seed,
+                            trainable=trainable,
+                            uniform_seed=self.uniform_seed,
+                            initial_variables=self.embedding_net_variables,
+                            mixed_prec=self.mixed_prec)
+                        center_kernel_result_arr.append(embedding_of_two_side_type_embedding)
+                    xyz_scatter = xyz_scatter + sum(center_kernel_result_arr)
 
                 if (not self.uniform_seed) and (self.seed is not None): self.seed += self.seed_shift
             input_r = tf.slice(tf.reshape(inputs_i, (-1, shape_i[1] // 4, 4)), [0, 0, 1], [-1, -1, 3])
