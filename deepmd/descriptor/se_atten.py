@@ -706,7 +706,7 @@ class DescrptSeAtten(DescrptSeA):
                     atm_embed = tf.reshape(atm_embed,
                                         [-1, te_out_dim])  # shape is [nframes*natoms[0]*self.nnei, te_out_dim]
                     atm_suffix = suffix + "two_side"
-                    two_side_embed = tf.concat([nei_embed, atm_embed], -1)
+                    two_side_embed = tf.concat([nei_embed, atm_embed], 1)
                     two_side_embed_output = embedding_net(
                         two_side_embed,
                         self.filter_neuron,
