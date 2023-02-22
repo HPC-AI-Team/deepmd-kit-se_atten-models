@@ -721,7 +721,7 @@ class DescrptSeAtten(DescrptSeA):
                         uniform_seed=self.uniform_seed,
                         initial_variables=self.embedding_net_variables,
                         mixed_prec=self.mixed_prec) 
-                    xyz_scatter = xyz_scatter + two_side_embed_output                   
+                    xyz_scatter = col_1_embedding_output + two_side_embed_output
 
                 # with (natom x nei_type_i) x out_size
                 #xyz_scatter = embedding_net(
