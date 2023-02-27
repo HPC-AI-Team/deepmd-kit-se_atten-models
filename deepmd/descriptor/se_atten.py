@@ -661,8 +661,6 @@ class DescrptSeAtten(DescrptSeA):
         if (not is_exclude):
             with tf.variable_scope(name, reuse=reuse):
                 te_out_dim = type_embedding.get_shape().as_list()[-1]
-                #col_1_embedding_output = tf.nn.embedding_lookup(type_embedding,
-                #                                                self.nei_type_vec)  # shape is [self.nnei, 1+te_out_dim]
                 col_1_suffix = suffix + "col1"
                 col_1_embedding_output = embedding_net(
                     xyz_scatter,
@@ -722,22 +720,6 @@ class DescrptSeAtten(DescrptSeA):
                         initial_variables=self.embedding_net_variables,
                         mixed_prec=self.mixed_prec) 
                     xyz_scatter = col_1_embedding_output + two_side_embed_output
-
-                # with (natom x nei_type_i) x out_size
-                #xyz_scatter = embedding_net(
-                #    xyz_scatter,
-                #    self.filter_neuron,
-                #    self.filter_precision,
-                #    activation_fn=activation_fn,
-                #    resnet_dt=self.filter_resnet_dt,
-                #    name_suffix=suffix,
-                #    stddev=stddev,
-                #    bavg=bavg,
-                #    seed=self.seed,
-                #    trainable=trainable,
-                #    uniform_seed=self.uniform_seed,
-                #    initial_variables=self.embedding_net_variables,
-                #    mixed_prec=self.mixed_prec)
                 if (not self.uniform_seed) and (self.seed is not None): self.seed += self.seed_shift
             input_r = tf.slice(tf.reshape(inputs_i, (-1, shape_i[1] // 4, 4)), [0, 0, 1], [-1, -1, 3])
             input_r = tf.nn.l2_normalize(input_r, -1)
