@@ -676,6 +676,7 @@ class DescrptSeAtten(DescrptSeA):
                     uniform_seed=self.uniform_seed,
                     initial_variables=self.embedding_net_variables,
                     mixed_prec=self.mixed_prec)
+                embedding_net_out_dim = col_1_embedding_output.get_shape().as_list()[-1]
 
                 nei_embed = tf.nn.embedding_lookup(type_embedding,
                                                    self.nei_type_vec)  # shape is [self.nnei, te_out_dim]
@@ -719,6 +720,7 @@ class DescrptSeAtten(DescrptSeA):
                         uniform_seed=self.uniform_seed,
                         initial_variables=self.embedding_net_variables,
                         mixed_prec=self.mixed_prec) 
+                    two_side_embed_output = tf.reshape(two_side_embed_output, [-1, embedding_net_out_dim])
                     xyz_scatter = col_1_embedding_output + two_side_embed_output
                 if (not self.uniform_seed) and (self.seed is not None): self.seed += self.seed_shift
             input_r = tf.slice(tf.reshape(inputs_i, (-1, shape_i[1] // 4, 4)), [0, 0, 1], [-1, -1, 3])
