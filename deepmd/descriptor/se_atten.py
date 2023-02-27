@@ -658,24 +658,38 @@ class DescrptSeAtten(DescrptSeA):
         if self.compress:
             raise RuntimeError('compression of attention descriptor is not supported at the moment')
 
-        gaussian_kernel_per_type = 3
-        gaussian_kernel_arg_mu = tf.Variable(
-            [tf.random_normal([type_embedding.get_shape().as_list()[0]]) # ntypes
-                                                 for _ in range(gaussian_kernel_per_type)], trainable=True) # ntypes x 3
-        gaussian_kernel_arg_sigma = tf.Variable(
-            [tf.random_normal([type_embedding.get_shape().as_list()[0]]) # ntypes
-                                                 for _ in range(gaussian_kernel_per_type)], trainable=True) # ntypes x 3
         @tf.function
+        # todo: not a broadcastable variable
         def gaussian_kernel(x, mu, sigma):
             mu = tf.cast(mu, tf.float64)
             sigma = tf.cast(sigma, tf.float64)
             base = tf.cast(math.sqrt(2*math.pi), tf.float64)
             diff = x - mu
-            return tf.exp(- tf.pow(diff, 2) / (2 * tf.pow(sigma, 2)))  / (sigma * base)
+            return x
+            #return tf.exp(- tf.pow(diff, 2) / (2 * tf.pow(sigma, 2)))  / (sigma * base)
 
+        gaussian_kernel_per_type = 3
         # natom x 4 x outputs_size
         if (not is_exclude):
             with tf.variable_scope(name, reuse=reuse):
+                def padding_args(v):
+                    last_row = tf.cast(tf.zeros([1, v.shape[-1]]), GLOBAL_TF_FLOAT_PRECISION)
+                    return tf.concat([v, last_row], 0)
+
+                gaussian_kernel_arg_mu = tf.get_variable('gaussian_mu',
+                                            shape=[self.ntypes, gaussian_kernel_per_type],
+                                            initializer=tf.random_normal_initializer(),
+                                            trainable=True,
+                                            dtype=GLOBAL_TF_FLOAT_PRECISION)
+                gaussian_kernel_arg_mu = padding_args(gaussian_kernel_arg_mu)
+                gaussian_kernel_arg_sigma = tf.get_variable('gaussian_sigma',
+                                                            shape=[self.ntypes, gaussian_kernel_per_type],
+                                                            initializer=tf.random_normal_initializer(),
+                                                            trainable=True,
+                                                            dtype=GLOBAL_TF_FLOAT_PRECISION)
+                gaussian_kernel_arg_sigma = tf.abs(gaussian_kernel_arg_sigma)
+                gaussian_kernel_arg_sigma = padding_args(gaussian_kernel_arg_sigma)
+
                 srij = xyz_scatter
                 # with (natom x nei_type_i) x out_size
                 xyz_scatter = embedding_net(
@@ -693,19 +707,13 @@ class DescrptSeAtten(DescrptSeA):
                     initial_variables=self.embedding_net_variables,
                     mixed_prec=self.mixed_prec)
                 out_size = xyz_scatter.get_shape().as_list()[-1]
-                #xyz_scatter = tf.nn.embedding_lookup(xyz_scatter,
-                #                                     self.nei_type_vec)
-                #xyz_scatter = tf.reshape(xyz_scatter, [-1, out_size])  # nframes*natoms[0] * nei * out_size
 
-                nei_kernel_result_arr = []
                 arg_mu = tf.nn.embedding_lookup(gaussian_kernel_arg_mu, self.nei_type_vec)
                 arg_sigma = tf.nn.embedding_lookup(gaussian_kernel_arg_sigma, self.nei_type_vec)
-                arg_mu = tf.reshape(arg_mu, [-1])
-                arg_sigma = tf.reshape(arg_sigma, [-1])
                 for i in range(gaussian_kernel_per_type):
                     embedding_of_embedding_suffix = suffix + "_ebd_of_ebd" + str(i)
                     res = embedding_net(
-                        gaussian_kernel(srij, tf.slice(arg_mu, [i], [1]), tf.slice(arg_sigma, [i], [1])),
+                        gaussian_kernel(srij, tf.slice(arg_mu, [0, i], [-1, 1]), tf.slice(arg_sigma, [0, i], [-1, 1])),
                         self.filter_neuron,
                         self.filter_precision,
                         activation_fn=activation_fn,
@@ -718,35 +726,36 @@ class DescrptSeAtten(DescrptSeA):
                         uniform_seed=self.uniform_seed,
                         initial_variables=self.embedding_net_variables,
                         mixed_prec=self.mixed_prec)  # ntypes * out_size
-                    nei_kernel_result_arr.append(res)
-                xyz_scatter = xyz_scatter + sum(nei_kernel_result_arr)
+                    res = tf.reshape(res, [-1, out_size])
+                    xyz_scatter += res
+                def padding_atm(atm):
+                    te_out_dim = type_embedding.get_shape().as_list()[-1]
+                    atm = tf.tile(atm, [1, self.nnei])
+                    atm = tf.reshape(atm, [-1, te_out_dim])
+                    return atm
+                arg_mu = tf.nn.embedding_lookup(gaussian_kernel_arg_mu, atype)
+                arg_mu = padding_atm(arg_mu)
+                arg_sigma = tf.nn.embedding_lookup(gaussian_kernel_arg_sigma, atype)
+                arg_sigma = padding_atm(arg_sigma)
 
-                if not self.type_one_side:
-                    arg_mu = tf.nn.embedding_lookup(gaussian_kernel_arg_mu, self.atype_nloc)
-                    arg_sigma = tf.nn.embedding_lookup(gaussian_kernel_arg_sigma, self.atype_nloc)
-                    arg_mu = tf.reshape(arg_mu, [-1])
-                    arg_sigma = tf.reshape(arg_sigma, [-1])
-                    center_kernel_result_arr = []
-                    for i in range(gaussian_kernel_per_type):
-                        two_side_type_embedding_suffix = suffix + "_two_side_ebd" + str(i)
-                        embedding_of_two_side_type_embedding = embedding_net(
-                            #gaussian_kernel(srij, *per_kernel_arg),
-                            gaussian_kernel(srij, tf.slice(arg_mu, [0], [1]), tf.slice(arg_sigma, [1], [1])),
-                            self.filter_neuron,
-                            self.filter_precision,
-                            activation_fn=activation_fn,
-                            resnet_dt=self.filter_resnet_dt,
-                            name_suffix=two_side_type_embedding_suffix,
-                            stddev=stddev,
-                            bavg=bavg,
-                            seed=self.seed,
-                            trainable=trainable,
-                            uniform_seed=self.uniform_seed,
-                            initial_variables=self.embedding_net_variables,
-                            mixed_prec=self.mixed_prec)
-                        center_kernel_result_arr.append(embedding_of_two_side_type_embedding)
-                    xyz_scatter = xyz_scatter + sum(center_kernel_result_arr)
-
+                for i in range(gaussian_kernel_per_type):
+                    embedding_of_embedding_suffix = suffix + "_ebd_of_ebd1" + str(i)
+                    res = embedding_net(
+                        gaussian_kernel(srij, tf.slice(arg_mu, [0, i], [-1, 1]), tf.slice(arg_sigma, [0, i], [-1, 1])),
+                        self.filter_neuron,
+                        self.filter_precision,
+                        activation_fn=activation_fn,
+                        resnet_dt=self.filter_resnet_dt,
+                        name_suffix=embedding_of_embedding_suffix,
+                        stddev=stddev,
+                        bavg=bavg,
+                        seed=self.seed,
+                        trainable=trainable,
+                        uniform_seed=self.uniform_seed,
+                        initial_variables=self.embedding_net_variables,
+                        mixed_prec=self.mixed_prec)  # ntypes * out_size
+                    res = tf.reshape(res, [-1, out_size])
+                    xyz_scatter += res
                 if (not self.uniform_seed) and (self.seed is not None): self.seed += self.seed_shift
             input_r = tf.slice(tf.reshape(inputs_i, (-1, shape_i[1] // 4, 4)), [0, 0, 1], [-1, -1, 3])
             input_r = tf.nn.l2_normalize(input_r, -1)
