@@ -730,7 +730,16 @@ class DescrptSeAtten(DescrptSeA):
                     index_of_two_side = tmpres1 + tmpres2
                     two_embd = tf.nn.embedding_lookup(embedding_of_two_side_type_embedding, index_of_two_side)
 
-                    xyz_scatter = xyz_scatter + two_embd
+                    origin_shape = tf.shape(xyz_scatter)
+                    two_matrix = tf.concat([tf.expand_dims(xyz_scatter, axis=-1),
+                                            tf.expand_dims(two_embd, axis=-1)],
+                                           axis=-1) # [nframes*natoms[0] * nei, out_size, 2]
+                    two_matrix = tf.reshape(two_matrix, [1, -1, out_size, 2]) # [1, nframes*natoms[0] * nei, out_size, 2]
+                    filter = tf.Variable(tf.random_normal([3, 3, 2, 1], dtype=self.filter_precision))
+                    conv_output = tf.nn.conv2d(two_matrix, filter, padding='SAME')
+                    conv_output = tf.reshape(conv_output, origin_shape)
+
+                    xyz_scatter = xyz_scatter + conv_output
 
                 if (not self.uniform_seed) and (self.seed is not None): self.seed += self.seed_shift
             input_r = tf.slice(tf.reshape(inputs_i, (-1, shape_i[1] // 4, 4)), [0, 0, 1], [-1, -1, 3])
