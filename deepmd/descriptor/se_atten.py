@@ -678,7 +678,7 @@ class DescrptSeAtten(DescrptSeA):
 
                 gaussian_kernel_arg_mu = tf.get_variable('gaussian_mu',
                                                          shape=[self.ntypes, gaussian_kernel_per_type],
-                                                         initializer=tf.random_normal_initializer(mean=0, stddev=1),
+                                                         initializer=tf.random_normal_initializer(mean=0, stddev=1, seed=self.seed),
                                                          trainable=True,
                                                          dtype=self.filter_precision)
                 #test_sigma = tf.get_variable('test_sigma',
@@ -697,7 +697,7 @@ class DescrptSeAtten(DescrptSeA):
                 gaussian_kernel_arg_mu = padding_args(gaussian_kernel_arg_mu)
                 gaussian_kernel_arg_sigma = tf.get_variable('gaussian_sigma',
                                                             shape=[self.ntypes, gaussian_kernel_per_type],
-                                                            initializer=tf.random_normal_initializer(),
+                                                            initializer=tf.random_normal_initializer(mean=0, stddev=1, seed=self.seed),
                                                             trainable=True,
                                                             #constraint=tf.nn.relu,
                                                             dtype=self.filter_precision)
