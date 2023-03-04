@@ -702,6 +702,9 @@ class DPTrainer (object):
             cur_batch = run_sess(self.sess, self.global_step)
             self.cur_batch = cur_batch
 
+            for op in self.descrpt.tfop:
+                self.sess.run(op, feed_dict=train_feed_dict)
+
             # on-the-fly validation
             if self.display_in_training and (cur_batch % self.disp_freq == 0):
                 if self.timing_in_training:
