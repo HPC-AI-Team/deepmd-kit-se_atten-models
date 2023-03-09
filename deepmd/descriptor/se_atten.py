@@ -655,7 +655,7 @@ class DescrptSeAtten(DescrptSeA):
         type_embedding = tf.cast(type_embedding, self.filter_precision)
         xyz_scatter = self._lookup_type_embedding(
             xyz_scatter, atype, type_embedding)
-        h = 3
+        h = 5
         layer_output = one_layer(xyz_scatter, h, name='H_net',
                                    reuse=reuse, seed=self.seed, use_timestep=self.filter_resnet_dt,
                                    activation_fn=activation_fn, precision=self.filter_precision,
