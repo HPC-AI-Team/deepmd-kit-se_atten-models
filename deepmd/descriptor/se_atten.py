@@ -849,19 +849,15 @@ class DescrptSeAtten(DescrptSeA):
                 else:
                     type_embedding_shape = type_embedding.get_shape().as_list()
                     type_embedding_nei = tf.tile(tf.reshape(type_embedding, [1, type_embedding_shape[0], -1]),
-                                                 [type_embedding_shape[0], 1, 1])  # (ntypes) * ntypes * Y
-                    type_embedding_center = tf.tile(tf.reshape(type_embedding, [type_embedding_shape[0], 1, -1]),
-                                                    [1, type_embedding_shape[0], 1])  # ntypes * (ntypes) * Y
-                    two_side_type_embedding = tf.concat([type_embedding_nei, type_embedding_center], -1) # ntypes * ntypes * (Y+Y)
-                    two_side_type_embedding = tf.reshape(two_side_type_embedding, [-1, two_side_type_embedding.shape[-1]])
-                    two_side_type_embedding_suffix = suffix + "_two_side_ebd" 
-                    embedding_of_two_side_type_embedding = embedding_net(
-                        two_side_type_embedding,
+                                                 [type_embedding_shape[0], 1, 1])
+                    type_embedding_nei = tf.reshape(type_embedding_nei, [-1, type_embedding_shape[-1]])
+                    embedding_of_nei = embedding_net(
+                        type_embedding_nei,
                         self.filter_neuron,
                         self.filter_precision,
                         activation_fn=activation_fn,
                         resnet_dt=self.filter_resnet_dt,
-                        name_suffix=two_side_type_embedding_suffix,
+                        name_suffix=suffix+'_embedding_of_nei',
                         stddev=stddev,
                         bavg=bavg,
                         seed=self.seed,
@@ -869,13 +865,29 @@ class DescrptSeAtten(DescrptSeA):
                         uniform_seed=self.uniform_seed,
                         initial_variables=self.embedding_net_variables,
                         mixed_prec=self.mixed_prec)
-                    #index_of_two_side = self.nei_type_vec * self.ntypes + tf.tile(atype, [1, self.nnei])
-                    tmpres1 = self.nei_type_vec * type_embedding_shape[0]
-                    tmpres2 = tf.tile(atype, [self.nnei])
-                    index_of_two_side = tmpres1 + tmpres2
-                    two_embd = tf.nn.embedding_lookup(embedding_of_two_side_type_embedding, index_of_two_side)
 
-                    xyz_scatter = xyz_scatter + two_embd
+                    type_embedding_center = tf.tile(tf.reshape(type_embedding, [type_embedding_shape[0], 1, -1]),
+                                                    [1, type_embedding_shape[0], 1])
+                    type_embedding_center = tf.reshape(type_embedding_center, [-1, type_embedding_shape[-1]])
+                    embedding_of_center = embedding_net(
+                        type_embedding_center,
+                        self.filter_neuron,
+                        self.filter_precision,
+                        activation_fn=activation_fn,
+                        resnet_dt=self.filter_resnet_dt,
+                        name_suffix=suffix+'_embedding_of_center',
+                        stddev=stddev,
+                        bavg=bavg,
+                        seed=self.seed,
+                        trainable=trainable,
+                        uniform_seed=self.uniform_seed,
+                        initial_variables=self.embedding_net_variables,
+                        mixed_prec=self.mixed_prec)
+                    lookup_nei = tf.nn.embedding_lookup(embedding_of_nei, self.nei_type_vec)
+                    idx_of_center = tf.tile(atype, [self.nnei])
+                    lookup_center = tf.nn.embedding_lookup(embedding_of_center, idx_of_center)
+
+                    xyz_scatter = xyz_scatter + lookup_nei + lookup_center
 
                 if (not self.uniform_seed) and (self.seed is not None):
                     self.seed += self.seed_shift
