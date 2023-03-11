@@ -875,7 +875,7 @@ class DescrptSeAtten(DescrptSeA):
                     index_of_two_side = tmpres1 + tmpres2
                     two_embd = tf.nn.embedding_lookup(embedding_of_two_side_type_embedding, index_of_two_side)
 
-                    xyz_scatter = xyz_scatter + two_embd
+                    xyz_scatter = xyz_scatter * two_embd + xyz_scatter
 
                 if (not self.uniform_seed) and (self.seed is not None):
                     self.seed += self.seed_shift
