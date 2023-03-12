@@ -107,7 +107,6 @@ class DescrptSeAtten(DescrptSeA):
                             uniform_seed=uniform_seed,
                             multi_task=multi_task
                             )
-        self.tfop = []
         """
         Constructor
         """
@@ -701,7 +700,6 @@ class DescrptSeAtten(DescrptSeA):
                     nei_embed = tf.nn.embedding_lookup(embedding_of_embedding, self.nei_type_vec)
                     #nei_embed = tf.reshape(self.nei_embed, [-1, out_size])  # nframes*natoms[0] * nei * out_size
 
-
                     raise RuntimeError('type_one_side has not been implemented')
                     xyz_scatter = xyz_scatter + nei_embed
                 else:
@@ -733,20 +731,6 @@ class DescrptSeAtten(DescrptSeA):
                     index_of_two_side = tmpres1 + tmpres2
                     two_embd = tf.nn.embedding_lookup(embedding_of_two_side_type_embedding, index_of_two_side)
 
-                    #origin_shape = tf.shape(xyz_scatter)
-                    #two_matrix = tf.concat([tf.expand_dims(xyz_scatter, axis=-1),
-                    #                        tf.expand_dims(two_embd, axis=-1)],
-                    #                       axis=-1) # [nframes*natoms[0] * nei, out_size, 2]
-                    #two_matrix = tf.reshape(two_matrix, [1, -1, out_size, 2]) # [1, nframes*natoms[0] * nei, out_size, 2]
-                    #filter = tf.Variable(tf.random_normal([3, 3, 2, 1], dtype=self.filter_precision, seed=self.seed))
-                    #conv_output = tf.nn.conv2d(two_matrix, filter, padding='SAME')
-                    #conv_output = tf.reshape(conv_output, origin_shape)
-
-                    #self.tfop.append(tf.Print(two_embd, [two_embd], message='------ value of two_embd, before addition = '))
-                    #self.tfop.append(tf.Print(xyz_scatter + two_embd, [xyz_scatter +two_embd], message='value of xyz_scatter + two_embd = '))
-                    #self.tfop.append(tf.Print(xyz_scatter, [xyz_scatter], message='value of xyz_scatter, before addition = '))
-                    #self.tfop.append(tf.Print(conv_output, [conv_output], message='value of conv_output, before addition = '))
-
                     k = 1
                     dot_product = xyz_scatter * two_embd
                     shifts = []
@@ -756,12 +740,6 @@ class DescrptSeAtten(DescrptSeA):
                         shifts.append(tf.roll(dot_product, shift=[-i], axis=[1]))
                     conv_output = sum(shifts)
                     xyz_scatter = xyz_scatter + conv_output
-
-                    #isnan = tf.is_nan(xyz_scatter)
-                    #nan_indicator = tf.reduce_sum(tf.cast(isnan, tf.int8))
-                    #self.tfop.append(tf.Print(nan_indicator, [nan_indicator], message='========== nan? = '))
-
-                    #self.tfop.append(tf.Print(xyz_scatter, [xyz_scatter], message='===== value of xyz_scatter = '))
 
                 if (not self.uniform_seed) and (self.seed is not None): self.seed += self.seed_shift
             input_r = tf.slice(tf.reshape(inputs_i, (-1, shape_i[1] // 4, 4)), [0, 0, 1], [-1, -1, 3])
