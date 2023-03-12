@@ -807,13 +807,13 @@ class DescrptSeAtten(DescrptSeA):
         if not is_exclude:
             with tf.variable_scope(name, reuse=reuse):
                 # with (natom x nei_type_i) x out_size
-                xyz_scatter = embedding_net(
+                embed_s = embedding_net(
                     xyz_scatter,
                     self.filter_neuron,
                     self.filter_precision,
                     activation_fn=activation_fn,
                     resnet_dt=self.filter_resnet_dt,
-                    name_suffix=suffix,
+                    name_suffix=suffix+'_s',
                     stddev=stddev,
                     bavg=bavg,
                     seed=self.seed,
@@ -821,31 +821,33 @@ class DescrptSeAtten(DescrptSeA):
                     uniform_seed=self.uniform_seed,
                     initial_variables=self.embedding_net_variables,
                     mixed_prec=self.mixed_prec)
-                out_size = xyz_scatter.get_shape().as_list()[-1]
+                out_size = embed_s.get_shape().as_list()[-1]
                 #xyz_scatter = tf.nn.embedding_lookup(xyz_scatter,
                 #                                     self.nei_type_vec)
                 #xyz_scatter = tf.reshape(xyz_scatter, [-1, out_size])  # nframes*natoms[0] * nei * out_size
 
                 if self.type_one_side:
-                    embedding_of_embedding_suffix = suffix + "_ebd_of_ebd"
-                    embedding_of_embedding = embedding_net(
-                        type_embedding,
+                    type_embedding_shape = type_embedding.get_shape().as_list()
+                    type_embedding_nei = tf.tile(tf.reshape(type_embedding, [1, type_embedding_shape[0], -1]),
+                                                 [type_embedding_shape[0], 1, 1])
+                    type_embedding_nei = tf.reshape(type_embedding_nei, [-1, type_embedding_shape[-1]])
+                    embedding_of_nei = embedding_net(
+                        type_embedding_nei,
                         self.filter_neuron,
                         self.filter_precision,
                         activation_fn=activation_fn,
                         resnet_dt=self.filter_resnet_dt,
-                        name_suffix=embedding_of_embedding_suffix,
+                        name_suffix=suffix+'_embedding_of_nei',
                         stddev=stddev,
                         bavg=bavg,
                         seed=self.seed,
                         trainable=trainable,
                         uniform_seed=self.uniform_seed,
                         initial_variables=self.embedding_net_variables,
-                        mixed_prec=self.mixed_prec)  # ntypes * out_size
-                    nei_embed = tf.nn.embedding_lookup(embedding_of_embedding, self.nei_type_vec)
-                    #nei_embed = tf.reshape(self.nei_embed, [-1, out_size])  # nframes*natoms[0] * nei * out_size
+                        mixed_prec=self.mixed_prec)
 
-                    xyz_scatter = xyz_scatter + nei_embed
+                    lookup_nei = tf.nn.embedding_lookup(embedding_of_nei, self.nei_type_vec)
+                    xyz_scatter = embed_s + lookup_nei
                 else:
                     type_embedding_shape = type_embedding.get_shape().as_list()
                     type_embedding_nei = tf.tile(tf.reshape(type_embedding, [1, type_embedding_shape[0], -1]),
@@ -883,11 +885,12 @@ class DescrptSeAtten(DescrptSeA):
                         uniform_seed=self.uniform_seed,
                         initial_variables=self.embedding_net_variables,
                         mixed_prec=self.mixed_prec)
-                    lookup_nei = tf.nn.embedding_lookup(embedding_of_nei, self.nei_type_vec)
+                    idx_of_nei = self.nei_type_vec * type_embedding_shape[0]
+                    lookup_nei = tf.nn.embedding_lookup(embedding_of_nei, idx_of_nei)
                     idx_of_center = tf.tile(atype, [self.nnei])
                     lookup_center = tf.nn.embedding_lookup(embedding_of_center, idx_of_center)
 
-                    xyz_scatter = xyz_scatter + lookup_nei + lookup_center
+                    xyz_scatter = embed_s + lookup_nei + lookup_center
 
                 if (not self.uniform_seed) and (self.seed is not None):
                     self.seed += self.seed_shift
