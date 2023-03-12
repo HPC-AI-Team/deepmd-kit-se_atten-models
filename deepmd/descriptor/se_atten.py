@@ -107,7 +107,6 @@ class DescrptSeAtten(DescrptSeA):
                             uniform_seed=uniform_seed,
                             multi_task=multi_task
                             )
-        self.tfop = []
         """
         Constructor
         """
@@ -681,30 +680,13 @@ class DescrptSeAtten(DescrptSeA):
                                                          initializer=tf.random_normal_initializer(mean=0, stddev=1, seed=self.seed),
                                                          trainable=True,
                                                          dtype=self.filter_precision)
-                #test_sigma = tf.get_variable('test_sigma',
-                #                          shape=[self.ntypes, gaussian_kernel_per_type],
-                #                          initializer=tf.random_normal_initializer(mean=0, stddev=1),
-                #                          trainable=True,
-                #                          dtype=self.filter_precision)
-                #test_mu = tf.get_variable('test_mu',
-                #                          shape=[self.ntypes, gaussian_kernel_per_type],
-                #                          initializer=tf.random_normal_initializer(mean=0, stddev=1),
-                #                          trainable=True,
-                #                          dtype=self.filter_precision)
-                #self.tfop.append(tf.Print(test_mu, [test_mu], message='test_mu = '))
-                #self.tfop.append(tf.Print(test_sigma, [test_sigma], message='test_sigma = '))
-                #self.tfop.append(tf.Print(gaussian_kernel_arg_mu, [gaussian_kernel_arg_mu], message='gaussian_mu = '))
                 gaussian_kernel_arg_mu = padding_args(gaussian_kernel_arg_mu)
                 gaussian_kernel_arg_sigma = tf.get_variable('gaussian_sigma',
                                                             shape=[self.ntypes, gaussian_kernel_per_type],
                                                             initializer=tf.random_normal_initializer(mean=0, stddev=1, seed=self.seed),
                                                             trainable=True,
-                                                            #constraint=tf.nn.relu,
                                                             dtype=self.filter_precision)
                 gaussian_kernel_arg_sigma = padding_args(gaussian_kernel_arg_sigma)
-
-                #self.tfop.append(tf.Print(xyz_scatter, [xyz_scatter], message='xyz_scatter = '))
-                #self.tfop.append(tf.Print(gaussian_kernel_arg_sigma, [gaussian_kernel_arg_sigma], message='gaussian_sigma = '))
 
                 srij = xyz_scatter
                 # with (natom x nei_type_i) x out_size
@@ -724,39 +706,14 @@ class DescrptSeAtten(DescrptSeA):
                     mixed_prec=self.mixed_prec)
                 out_size = xyz_scatter.get_shape().as_list()[-1]
 
-                #self.tfop.append(tf.Print(gaussian_kernel_arg_mu, [tf.shape(gaussian_kernel_arg_mu)], message='shape of mu = '))
-                #self.tfop.append(tf.Print(gaussian_kernel_arg_sigma, [tf.shape(gaussian_kernel_arg_sigma)], message='shape of sigma = '))
-
                 arg_mu = tf.nn.embedding_lookup(gaussian_kernel_arg_mu, self.nei_type_vec)
-                #arg_test_mu = tf.nn.embedding_lookup(test_mu, self.nei_type_vec)
-                #arg_test_sigma = tf.nn.embedding_lookup(test_sigma, self.nei_type_vec)
-                #self.tfop.append(tf.Print(arg_test_mu, [arg_test_mu], message='value of arg_test_mu = '))
-                #self.tfop.append(tf.Print(arg_test_sigma, [arg_test_sigma], message='value of arg_test_sigma = '))
                 arg_sigma = tf.nn.embedding_lookup(gaussian_kernel_arg_sigma, self.nei_type_vec)
 
-                #self.tfop.append(tf.Print(arg_mu, [tf.shape(arg_mu)],
-                #                          message='after lookup: shape of mu = '))
-                #self.tfop.append(tf.Print(arg_sigma, [tf.shape(arg_sigma)],
-                #                          message='after lookup: shape of sigma = '))
                 for i in range(gaussian_kernel_per_type):
                     embedding_of_embedding_suffix = suffix + "_ebd_of_ebd" + str(i)
-                    #msg = str(i) + ' th gaussian kernel origin'
-                    #self.tfop.append(tf.Print(srij, [tf.shape(srij)], message='======== ' + msg))
                     karg_mu = tf.slice(arg_mu, [0, i], [-1, 1])
                     karg_sigma = tf.slice(arg_sigma, [0, i], [-1, 1])
-                    #self.tfop.append(tf.Print(karg_mu, [tf.shape(karg_mu)], message='shape of karg mu = '))
-                    #self.tfop.append(tf.Print(karg_sigma, [tf.shape(karg_sigma)], message='shape of karg sigma'))
                     embedding_net_param = gaussian_kernel(srij, karg_mu, karg_sigma)
-
-                    #karg_test_mu = tf.slice(arg_test_mu, [0, i], [-1, 1])
-                    #karg_test_sigma = tf.slice(arg_test_sigma, [0, i], [-1, 1])
-                    #embedding_net_param_test = gaussian_kernel(srij, karg_test_mu, karg_test_sigma)
-                    #self.tfop.append(tf.Print(embedding_net_param_test, [embedding_net_param_test], message='embedding_net_param_test = '))
-                    #self.tfop.append(tf.Print(karg_test_mu, [karg_test_mu], message='karg_test_mu = '))
-                    #self.tfop.append(tf.Print(karg_test_sigma, [karg_test_sigma], message='karg_test_sigma = '))
-                    #self.tfop.append(tf.Print(embedding_net_param_test, [embedding_net_param_test], summarize=-1, message='content of gaussian output = '))
-                    #karg_test_mu = tf.abs(karg_test_mu)
-                    #karg_test_sigma = tf.abs(karg_test_sigma)
 
                     res = embedding_net(
                         embedding_net_param,
@@ -773,11 +730,7 @@ class DescrptSeAtten(DescrptSeA):
                         initial_variables=self.embedding_net_variables,
                         mixed_prec=self.mixed_prec)  # ntypes * out_size
                     res = tf.reshape(res, [-1, out_size])
-                    #self.tfop.append(tf.Print(embedding_net_param_test, [embedding_net_param_test], message='after embedding net, embedding_net_param_test = '))
-                    #self.tfop.append(tf.Print(karg_test_mu, [karg_test_mu], message='after embedding net, karg_test_mu = '))
-                    #self.tfop.append(tf.Print(karg_test_sigma, [karg_test_sigma], message='after embedding net, karg_test_sigma = '))
                     xyz_scatter += res
-                #self.tfop.append(tf.Print(atype, [atype], message='value of atype = '))
                 arg_mu = tf.nn.embedding_lookup(gaussian_kernel_arg_mu, atype)
                 arg_mu = tf.tile(arg_mu, [self.nnei, 1])
                 arg_sigma = tf.nn.embedding_lookup(gaussian_kernel_arg_sigma, atype)
@@ -785,12 +738,8 @@ class DescrptSeAtten(DescrptSeA):
 
                 for i in range(gaussian_kernel_per_type):
                     embedding_of_embedding_suffix = suffix + "_ebd_of_ebd1" + str(i)
-                    msg = str(i) + ' th gaussian kernel nei'
-                    #self.tfop.append(tf.Print(srij, [tf.shape(srij)], message='======== ' + msg))
                     karg_mu = tf.slice(arg_mu, [0, i], [-1, 1])
                     karg_sigma = tf.slice(arg_sigma, [0, i], [-1, 1])
-                    #self.tfop.append(tf.Print(karg_mu, [tf.shape(karg_mu)], message='shape of karg mu = '))
-                    #self.tfop.append(tf.Print(karg_sigma, [tf.shape(karg_sigma)], message='shape of karg sigma'))
                     embedding_net_param = gaussian_kernel(srij, karg_mu, karg_sigma)
                     res = embedding_net(
                         embedding_net_param,
