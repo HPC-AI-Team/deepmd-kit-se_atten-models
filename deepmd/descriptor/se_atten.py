@@ -813,7 +813,7 @@ class DescrptSeAtten(DescrptSeA):
             diff = x - mu
             return tf.exp(- tf.pow(diff, 2) / (2 * tf.pow(sigma, 2)))  / (sigma * base)
 
-        gaussian_kernel_per_type = 3
+        gaussian_kernel_per_type = 5
         # natom x 4 x outputs_size
         if not is_exclude:
             with tf.variable_scope(name, reuse=reuse):
