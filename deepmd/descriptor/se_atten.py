@@ -910,21 +910,36 @@ class DescrptSeAtten(DescrptSeA):
                 tf.reshape(inputs_i, (-1, shape_i[1] // 4, 4)), [0, 0, 1], [-1, -1, 3]
             )
             input_r = tf.nn.l2_normalize(input_r, -1)
-            # natom x nei_type_i x out_size
-            xyz_scatter_att = tf.reshape(
-                self._attention_layers(
-                    xyz_scatter,
-                    self.attn_layer,
-                    shape_i,
-                    outputs_size,
-                    input_r,
-                    dotr=self.attn_dotr,
-                    do_mask=self.attn_mask,
-                    trainable=trainable,
-                    suffix=suffix,
-                ),
-                (-1, shape_i[1] // 4, outputs_size[-1]),
-            )
+            if self.attn_layer == 0:
+                beta = np.zeros([1, self.filter_neuron[-1]]).astype(
+                    GLOBAL_NP_FLOAT_PRECISION
+                )
+                gamma = np.ones([1, self.filter_neuron[-1]]).astype(
+                    GLOBAL_NP_FLOAT_PRECISION
+                )
+                xyz_scatter_att = tf.reshape(
+                    tf.keras.layers.LayerNormalization(
+                        beta_initializer=tf.constant_initializer(beta),
+                        gamma_initializer=tf.constant_initializer(gamma),
+                    )(xyz_scatter),
+                    (-1, shape_i[1] // 4, outputs_size[-1]),
+                )
+            else:
+                # natom x nei_type_i x out_size
+                xyz_scatter_att = tf.reshape(
+                    self._attention_layers(
+                        xyz_scatter,
+                        self.attn_layer,
+                        shape_i,
+                        outputs_size,
+                        input_r,
+                        dotr=self.attn_dotr,
+                        do_mask=self.attn_mask,
+                        trainable=trainable,
+                        suffix=suffix,
+                    ),
+                    (-1, shape_i[1] // 4, outputs_size[-1]),
+                )
             # xyz_scatter = tf.reshape(xyz_scatter, (-1, shape_i[1] // 4, outputs_size[-1]))
         else:
             raise RuntimeError("this should not be touched")
