@@ -818,6 +818,7 @@ class DescrptSeAtten(DescrptSeA):
         if not is_exclude:
             with tf.variable_scope(name, reuse=reuse):
                 def padding_args(v):
+                    # arguments for empty atoms
                     last_row = tf.cast(tf.ones([1, v.shape[-1]]), self.filter_precision)
                     return tf.concat([v, last_row], 0)
 
