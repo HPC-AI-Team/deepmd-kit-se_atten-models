@@ -875,7 +875,21 @@ class DescrptSeAtten(DescrptSeA):
                     index_of_two_side = tmpres1 + tmpres2
                     two_embd = tf.nn.embedding_lookup(embedding_of_two_side_type_embedding, index_of_two_side)
 
-                    xyz_scatter = xyz_scatter * two_embd + xyz_scatter
+                    embedding_compose_s = tf.get_variable(
+                        "embedding_compose_s",
+                        1,
+                        dtype=GLOBAL_TF_FLOAT_PRECISION,
+                        initializer=tf.random_normal_initializer(mean=0, stddev=1, seed=self.seed),
+                        trainable=True,
+                    )
+                    embedding_compose_n = tf.get_variable(
+                        "embedding_compose_n",
+                        1,
+                        dtype=GLOBAL_TF_FLOAT_PRECISION,
+                        initializer=tf.random_normal_initializer(mean=0, stddev=1, seed=self.seed),
+                        trainable=True,
+                    )
+                    xyz_scatter = xyz_scatter * two_embd + embedding_compose_s * xyz_scatter + embedding_compose_n * two_embd
 
                 if (not self.uniform_seed) and (self.seed is not None):
                     self.seed += self.seed_shift
