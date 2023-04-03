@@ -876,7 +876,7 @@ class DescrptSeAtten(DescrptSeA):
                     index_of_two_side = tmpres1 + tmpres2
                     two_embd = tf.nn.embedding_lookup(embedding_of_two_side_type_embedding, index_of_two_side)
 
-                    k = 1
+                    k = 2
                     dot_product = xyz_scatter * two_embd
                     shifts = []
                     shifts.append(dot_product)
