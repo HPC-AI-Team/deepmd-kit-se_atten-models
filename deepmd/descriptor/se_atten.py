@@ -877,14 +877,14 @@ class DescrptSeAtten(DescrptSeA):
 
                     embedding_compose_s = tf.get_variable(
                         "embedding_compose_s",
-                        1,
+                        [out_size],
                         dtype=GLOBAL_TF_FLOAT_PRECISION,
                         initializer=tf.random_normal_initializer(mean=0, stddev=1, seed=self.seed),
                         trainable=True,
                     )
                     embedding_compose_n = tf.get_variable(
                         "embedding_compose_n",
-                        1,
+                        [out_size],
                         dtype=GLOBAL_TF_FLOAT_PRECISION,
                         initializer=tf.random_normal_initializer(mean=0, stddev=1, seed=self.seed),
                         trainable=True,
