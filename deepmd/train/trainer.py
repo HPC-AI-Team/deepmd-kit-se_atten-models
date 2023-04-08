@@ -908,7 +908,7 @@ class DPTrainer:
                     toc = time.time()
                     test_time = toc - tic
                     log.info(
-                        "model7 batch %7d training time %.2f s, testing time %.2f s"
+                        "model12 batch %7d training time %.2f s, testing time %.2f s"
                         % (cur_batch, train_time, test_time)
                     )
                     # the first training time is not accurate
