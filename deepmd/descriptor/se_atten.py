@@ -835,25 +835,9 @@ class DescrptSeAtten(DescrptSeA):
                 #xyz_scatter = tf.reshape(xyz_scatter, [-1, out_size])  # nframes*natoms[0] * nei * out_size
 
                 if self.type_one_side:
-                    embedding_of_embedding_suffix = suffix + "_ebd_of_ebd"
-                    embedding_of_embedding = embedding_net(
-                        type_embedding,
-                        self.filter_neuron,
-                        self.filter_precision,
-                        activation_fn=activation_fn,
-                        resnet_dt=self.filter_resnet_dt,
-                        name_suffix=embedding_of_embedding_suffix,
-                        stddev=stddev,
-                        bavg=bavg,
-                        seed=self.seed,
-                        trainable=trainable,
-                        uniform_seed=self.uniform_seed,
-                        initial_variables=self.embedding_net_variables,
-                        mixed_prec=self.mixed_prec)  # ntypes * out_size
-                    nei_embed = tf.nn.embedding_lookup(embedding_of_embedding, self.nei_type_vec)
-                    #nei_embed = tf.reshape(self.nei_embed, [-1, out_size])  # nframes*natoms[0] * nei * out_size
-
-                    xyz_scatter = xyz_scatter + nei_embed
+                    raise RuntimeError(
+                        "type one side of attention descriptor is not supported at the moment"
+                    )
                 else:
                     type_embedding_shape = type_embedding.get_shape().as_list()
                     type_embedding_nei = tf.tile(tf.reshape(type_embedding, [1, type_embedding_shape[0], -1]),
