@@ -1105,7 +1105,23 @@ class DescrptSeAtten(DescrptSeA):
                         )
 
                     if not self.compress:
-                        xyz_scatter = xyz_scatter * two_embd + xyz_scatter
+                        out_size = xyz_scatter.get_shape().as_list()[-1]
+                        embedding_compose_s = tf.get_variable(
+                            "embedding_compose_s",
+                            [out_size],
+                            dtype=GLOBAL_TF_FLOAT_PRECISION,
+                            initializer=tf.random_normal_initializer(mean=bavg, stddev=stddev, seed=self.seed),
+                            trainable=True,
+                        )
+                        embedding_compose_n = tf.get_variable(
+                            "embedding_compose_n",
+                            [out_size],
+                            dtype=GLOBAL_TF_FLOAT_PRECISION,
+                            initializer=tf.random_normal_initializer(mean=bavg, stddev=stddev, seed=self.seed),
+                            trainable=True,
+                        )
+                        xyz_scatter = xyz_scatter * two_embd + embedding_compose_s * xyz_scatter + embedding_compose_n * two_embd
+
                     else:
                         return op_module.tabulate_fusion_se_a(
                             tf.cast(self.table.data[net], self.filter_precision),
