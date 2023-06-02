@@ -161,10 +161,10 @@ class DescrptSeAtten(DescrptSeA):
         self.two_side_embeeding_net_variables = None
         self.layer_size = len(neuron)
 
-        if self.compressible and self.attn_layer != 0:
-            raise RuntimeError(
-                "attention layer must be set to 0 when compression of se_atten is enabled"
-            )
+        # if self.compressible and self.attn_layer != 0:
+        #     raise RuntimeError(
+        #         "attention layer must be set to 0 when compression of se_atten is enabled"
+        #     )
 
         # descrpt config
         self.sel_all_a = [sel]
