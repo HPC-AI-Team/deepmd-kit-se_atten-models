@@ -1053,7 +1053,7 @@ class DPTrainer:
                     test_time = toc - tic
                     wall_time = toc - wall_time_tic
                     log.info(
-                        "batch %7d training time %.2f s, testing time %.2f s, total wall time %.2f s"
+                        "model6 batch %7d training time %.2f s, testing time %.2f s, total wall time %.2f s"
                         % (cur_batch, train_time, test_time, wall_time)
                     )
                     # the first training time is not accurate
